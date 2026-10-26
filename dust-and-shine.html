@@ -1,0 +1,1091 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Dust &amp; Shine</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,wght@0,600;1,500&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --soot: #1c1815;
+    --soot-2: #262019;
+    --dust: #9a8a72;
+    --plaster: #ece3d3;
+    --brass: #d8a94d;
+    --steam: #9db3ba;
+    --rust: #b0603f;
+  }
+  * { box-sizing: border-box; }
+  html, body { margin:0; padding:0; width:100%; height:100%; overflow:hidden; background:#0a0908;
+    font-family: system-ui, -apple-system, 'Segoe UI', sans-serif; }
+  canvas { display:block; }
+  .hidden { display:none !important; }
+
+  #blocker {
+    position:fixed; inset:0; z-index:50;
+    display:flex; align-items:center; justify-content:center;
+    background: radial-gradient(ellipse at center, rgba(28,24,21,0.55), rgba(8,7,6,0.94));
+    backdrop-filter: blur(2px);
+  }
+  #startCard {
+    max-width:480px; margin:0 20px; padding:34px 32px;
+    background: linear-gradient(180deg, var(--soot-2), var(--soot));
+    border:1px solid rgba(216,169,77,0.25); border-radius:10px;
+    text-align:center; box-shadow:0 20px 60px rgba(0,0,0,0.55);
+  }
+  #startCard h1 {
+    font-family:'Fraunces', Georgia, serif; font-size:42px; font-weight:600;
+    margin:0 0 14px; letter-spacing:-0.01em;
+  }
+  .w-dust { color: var(--dust); }
+  .amp { color: var(--plaster); opacity:0.5; font-style:italic; padding:0 6px; }
+  .w-shine { color: var(--brass); font-style:italic; font-weight:500; }
+  #startCard p { color:var(--plaster); opacity:0.82; line-height:1.5; font-size:15px; margin:0 0 22px; }
+  #startBtn {
+    font-family:inherit; font-size:15px; font-weight:600; letter-spacing:0.02em;
+    color:var(--soot); background:var(--brass); border:none; border-radius:6px;
+    padding:13px 28px; cursor:pointer; transition:transform 0.15s ease, background 0.15s ease;
+  }
+  #startBtn:hover { background:#e6bb63; transform:translateY(-1px); }
+  .controlsHint {
+    margin-top:22px; padding-top:18px; border-top:1px solid rgba(236,227,211,0.12);
+    display:flex; flex-wrap:wrap; gap:8px 14px; justify-content:center;
+    font-size:12px; color:var(--dust); letter-spacing:0.02em;
+  }
+  .controlsHint b { color:var(--plaster); font-weight:600; }
+  .desktopNote { margin-top:14px; font-size:11px; color:var(--rust); opacity:0.9; }
+
+  #hud { position:fixed; inset:0; z-index:20; pointer-events:none; }
+  #topLeft {
+    position:absolute; top:18px; left:18px;
+    background:rgba(20,17,14,0.55); backdrop-filter:blur(6px);
+    border:1px solid rgba(236,227,211,0.1); border-radius:8px;
+    padding:12px 16px; min-width:190px;
+  }
+  .eyebrow { font-size:10px; letter-spacing:0.12em; text-transform:uppercase; color:var(--dust); margin-bottom:2px; }
+  .zoneEyebrow { margin-top:10px; }
+  #roomPct { font-size:22px; font-weight:700; color:var(--plaster); }
+  #zoneInfo { font-size:14px; color:var(--brass); font-weight:600; }
+  #trashCounter { margin-top:10px; font-size:12px; color:var(--dust); }
+
+  #crosshairWrap { position:absolute; top:50%; left:50%; transform:translate(-50%,-50%); }
+  .ringTrack { fill:none; stroke:rgba(236,227,211,0.22); stroke-width:2.5; }
+  .ringFill { fill:none; stroke:var(--brass); stroke-width:2.5; stroke-linecap:round;
+    transform-origin:23px 23px; transform:rotate(-90deg); }
+  #ringDot { fill:var(--plaster); }
+
+  .pill {
+    position:absolute; left:50%; transform:translateX(-50%);
+    background:rgba(20,17,14,0.88); color:var(--plaster);
+    padding:9px 16px; border-radius:20px; font-size:13px;
+    border:1px solid rgba(216,169,77,0.3);
+    opacity:0; transition:opacity 0.25s ease; white-space:nowrap; max-width:80vw;
+    text-align:center;
+  }
+  #hint { top:70%; }
+  #toast { top:13%; font-weight:600; }
+  .pill.show { opacity:1; }
+
+  #toolbar { position:absolute; bottom:22px; left:50%; transform:translateX(-50%); display:flex; gap:8px; }
+  .toolSlot {
+    background:rgba(20,17,14,0.65); border:1px solid rgba(236,227,211,0.12);
+    border-radius:8px; padding:8px 14px; text-align:center; min-width:78px;
+    color:var(--dust); transition:all 0.15s ease;
+  }
+  .toolSlot .toolKey { display:block; font-size:10px; opacity:0.7; }
+  .toolSlot .toolName { display:block; font-size:12px; font-weight:600; margin-top:2px; white-space:nowrap; }
+  .toolSlot.locked { opacity:0.35; }
+  .toolSlot.active { border-color:var(--brass); background:rgba(216,169,77,0.14); color:var(--plaster); }
+  .toolSlot.active .toolName { color:var(--brass); }
+
+  #completion {
+    position:fixed; inset:0; z-index:60; display:flex; align-items:center; justify-content:center;
+    background: radial-gradient(ellipse at center, rgba(46,36,18,0.75), rgba(8,7,6,0.96));
+  }
+  #completionCard { text-align:center; max-width:440px; padding:36px; }
+  #completionCard h1 { font-family:'Fraunces', Georgia, serif; font-size:48px; margin:0 0 12px; }
+  #completionCard p { color:var(--plaster); opacity:0.85; margin:0 0 26px; line-height:1.6; }
+  #restartBtn {
+    font-family:inherit; font-size:15px; font-weight:600; color:var(--soot); background:var(--brass);
+    border:none; border-radius:6px; padding:13px 28px; cursor:pointer;
+  }
+
+  #errorBanner {
+    position:fixed; top:0; left:0; right:0; z-index:100;
+    background:#4a1c14; color:#f3d9cf; font-size:13px; padding:10px 16px;
+    font-family: ui-monospace, 'Courier New', monospace;
+  }
+</style>
+</head>
+<body>
+
+  <div id="blocker">
+    <div id="startCard">
+      <h1><span class="w-dust">Dust</span><span class="amp">&amp;</span><span class="w-shine">Shine</span></h1>
+      <p id="introText">Nobody's touched this room in a long time. Grab whatever's on hand and start clearing it — better tools turn up as you go.</p>
+      <button id="startBtn">Click to start cleaning</button>
+      <div class="controlsHint">
+        <span><b>WASD</b> move</span>
+        <span><b>Mouse</b> look</span>
+        <span><b>Hold Click</b> clean</span>
+        <span><b>1–4 / Scroll</b> tool</span>
+        <span><b>E</b> pick up</span>
+        <span><b>Q</b> spot check</span>
+        <span><b>Shift</b> sprint</span>
+        <span><b>C</b> crouch</span>
+      </div>
+      <div class="desktopNote" id="desktopNote">Best on a desktop with a keyboard and mouse.</div>
+    </div>
+  </div>
+
+  <div id="hud" class="hidden">
+    <div id="topLeft">
+      <div class="eyebrow">Room</div>
+      <div id="roomPct">0% clean</div>
+      <div class="eyebrow zoneEyebrow">Current zone</div>
+      <div id="zoneInfo">—</div>
+      <div id="trashCounter">Trash 0/5</div>
+    </div>
+    <div id="crosshairWrap">
+      <svg id="crosshair" width="46" height="46" viewBox="0 0 46 46">
+        <circle cx="23" cy="23" r="18" class="ringTrack"></circle>
+        <circle id="ringProgress" cx="23" cy="23" r="18" class="ringFill"></circle>
+        <circle id="ringDot" cx="23" cy="23" r="2.4"></circle>
+      </svg>
+    </div>
+    <div id="hint" class="pill"></div>
+    <div id="toast" class="pill"></div>
+    <div id="toolbar"></div>
+  </div>
+
+  <div id="completion" class="hidden">
+    <div id="completionCard">
+      <h1><span class="w-shine">Spotless.</span></h1>
+      <p id="completionStats">Every surface, every corner, every last crumb.</p>
+      <button id="restartBtn">Clean it again</button>
+    </div>
+  </div>
+
+  <div id="errorBanner" class="hidden"></div>
+
+  <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/build/three.min.js"></script>
+  <script>
+  (function(){
+  'use strict';
+
+  /* ============================================================
+     ERROR SAFETY NET
+     ============================================================ */
+  function showErrorBanner(msg){
+    var el = document.getElementById('errorBanner');
+    if(!el) return;
+    el.textContent = 'Something went wrong: ' + msg + ' — try reloading the page.';
+    el.classList.remove('hidden');
+  }
+  window.addEventListener('error', function(e){
+    showErrorBanner((e && e.message) ? e.message : 'unknown error');
+  });
+
+  if (typeof THREE === 'undefined') {
+    showErrorBanner('The 3D library failed to load from the CDN. Check your internet connection and reload.');
+    return;
+  }
+
+  if (/Mobi|Android/i.test(navigator.userAgent)) {
+    var note = document.getElementById('desktopNote');
+    if (note) note.textContent = 'This game needs a keyboard and mouse — it will not work on a phone or tablet.';
+  }
+
+  /* ============================================================
+     CONFIG  (tune-me constants)
+     ============================================================ */
+  var CFG = {
+    room: { width: 8, depth: 7, height: 3.4 },
+    eyeHeightStand: 1.62,
+    eyeHeightCrouch: 1.05,
+    playerRadius: 0.32,
+    moveSpeed: 2.6,
+    sprintMult: 1.75,
+    crouchMult: 0.55,
+    mouseSens: 0.0022,
+    maxInteractRange: 3.4,
+    alphaEps: 0.045,
+    zoneThreshold: 0.90,
+    eps: 0.003
+  };
+  var ROOM_BOUNDS = {
+    minX: -CFG.room.width/2, maxX: CFG.room.width/2,
+    minZ: -CFG.room.depth/2, maxZ: CFG.room.depth/2
+  };
+
+  /* ============================================================
+     UTIL
+     ============================================================ */
+  function clamp01(v){ return v<0?0:(v>1?1:v); }
+  function lerp(a,b,t){ return a+(b-a)*t; }
+  function rand(a,b){ return a+Math.random()*(b-a); }
+
+  /* ============================================================
+     THREE.JS SETUP
+     ============================================================ */
+  var scene = new THREE.Scene();
+  scene.background = new THREE.Color(0x0e0c0a);
+  scene.fog = new THREE.Fog(0x0e0c0a, 6, 15);
+
+  var camera = new THREE.PerspectiveCamera(70, window.innerWidth/window.innerHeight, 0.05, 60);
+  camera.rotation.order = 'YXZ';
+
+  var renderer = new THREE.WebGLRenderer({ antialias:true });
+  renderer.setPixelRatio(Math.min(window.devicePixelRatio||1, 2));
+  renderer.setSize(window.innerWidth, window.innerHeight);
+  document.body.appendChild(renderer.domElement);
+
+  window.addEventListener('resize', function(){
+    camera.aspect = window.innerWidth/window.innerHeight;
+    camera.updateProjectionMatrix();
+    renderer.setSize(window.innerWidth, window.innerHeight);
+  });
+
+  var ambientLight = new THREE.AmbientLight(0x8f97a8, 0.55);
+  scene.add(ambientLight);
+  var hemiLight = new THREE.HemisphereLight(0xb9c4d6, 0x2c2418, 0.4);
+  scene.add(hemiLight);
+  var sunLight = new THREE.DirectionalLight(0xfff0d2, 0.85);
+  sunLight.position.set(-1.2, 2.6, -6.5);
+  sunLight.target.position.set(0, 1.2, -2.2);
+  scene.add(sunLight);
+  scene.add(sunLight.target);
+  var lampLight = new THREE.PointLight(0xffc98a, 0.5, 4.2, 2);
+  lampLight.position.set(-2.0, 0.62, 0.75);
+  scene.add(lampLight);
+
+  /* ============================================================
+     ROOM & FURNITURE
+     ============================================================ */
+  var collidables = [];   // {minX,maxX,minZ,maxZ} — XZ collision boxes
+  var solidMeshes = [];   // occluders for the cleaning raycast
+
+  function addBox(w,h,d,x,y,z,color,opts){
+    opts = opts || {};
+    var geo = new THREE.BoxGeometry(w,h,d);
+    var mat = new THREE.MeshStandardMaterial({
+      color: color,
+      roughness: opts.roughness!==undefined ? opts.roughness : 0.9,
+      metalness: opts.metalness || 0,
+      flatShading: !!opts.flatShading
+    });
+    var mesh = new THREE.Mesh(geo, mat);
+    mesh.position.set(x,y,z);
+    scene.add(mesh);
+    solidMeshes.push(mesh);
+    if(opts.collide !== false){
+      collidables.push({ minX:x-w/2, maxX:x+w/2, minZ:z-d/2, maxZ:z+d/2 });
+    }
+    return mesh;
+  }
+
+  function addPlane(w,h,x,y,z,rotX,rotY,color,opts){
+    opts = opts || {};
+    var geo = new THREE.PlaneGeometry(w,h);
+    var mat = new THREE.MeshStandardMaterial({
+      color: color,
+      roughness: opts.roughness!==undefined ? opts.roughness : 0.95,
+      metalness: 0
+    });
+    var mesh = new THREE.Mesh(geo, mat);
+    mesh.position.set(x,y,z);
+    mesh.rotation.x = rotX||0;
+    mesh.rotation.y = rotY||0;
+    scene.add(mesh);
+    if(opts.occlude !== false) solidMeshes.push(mesh);
+    return mesh;
+  }
+
+  // Floor / ceiling / walls
+  addPlane(CFG.room.width, CFG.room.depth, 0, 0, 0, -Math.PI/2, 0, 0x5b4530, {roughness:1});
+  addPlane(CFG.room.width, CFG.room.depth, 0, CFG.room.height, 0, Math.PI/2, 0, 0xd8cdb8, {roughness:1});
+  addPlane(CFG.room.width, CFG.room.height, 0, CFG.room.height/2, -CFG.room.depth/2, 0, 0, 0xb9ac95);
+  addPlane(CFG.room.width, CFG.room.height, 0, CFG.room.height/2, CFG.room.depth/2, 0, Math.PI, 0xb9ac95);
+  addPlane(CFG.room.depth, CFG.room.height, -CFG.room.width/2, CFG.room.height/2, 0, 0, Math.PI/2, 0xb2a58d);
+  addPlane(CFG.room.depth, CFG.room.height, CFG.room.width/2, CFG.room.height/2, 0, 0, -Math.PI/2, 0xb2a58d);
+
+  // Door (decorative)
+  addPlane(1.0, 2.05, -2.5, 1.025, CFG.room.depth/2-0.015, 0, Math.PI, 0x362818, {occlude:false});
+
+  // Window (glass, mullions)
+  addPlane(1.35, 1.25, 0, 1.9, -3.47, 0, 0, 0x7c94a0, {occlude:false, roughness:0.25});
+  addBox(1.4, 0.05, 0.04, 0, 1.9, -3.44, 0x2c2118, {collide:false});
+  addBox(0.05, 1.3, 0.04, 0, 1.9, -3.44, 0x2c2118, {collide:false});
+
+  // Desk + chair
+  addBox(1.3, 0.75, 0.7, -3.2, 0.375, -3.0, 0x6b4a30);
+  addBox(0.4, 0.08, 0.4, -3.2, 0.42, -2.3, 0x3c2b1c);
+  addBox(0.4, 0.5, 0.08, -3.2, 0.67, -2.12, 0x3c2b1c);
+
+  // Bookshelf + books
+  addBox(0.9, 2.0, 0.35, 2.6, 1.0, -3.28, 0x5e4128);
+  addBox(0.6, 0.22, 0.28, 2.6, 1.72, -3.26, 0x7a2f2f, {collide:false, flatShading:true});
+
+  // Wardrobe
+  addBox(1.0, 2.3, 0.6, 3.45, 1.15, 1.6, 0x4d3620);
+
+  // Bed + pillow
+  addBox(1.5, 0.55, 2.0, -3.0, 0.275, 1.6, 0x5a4028);
+  addBox(1.35, 0.14, 1.85, -3.0, 0.62, 1.6, 0x7d93a8, {collide:false});
+  addBox(0.5, 0.12, 0.32, -3.0, 0.66, 0.75, 0xd8cdb8, {collide:false});
+
+  // Nightstand + lamp
+  addBox(0.4, 0.5, 0.4, -2.0, 0.25, 0.75, 0x5e4128);
+  addBox(0.1, 0.22, 0.1, -2.0, 0.61, 0.75, 0x2c2118, {collide:false});
+
+  // Rug base
+  addPlane(2.4, 2.0, 0.2, 0.008, 0.6, -Math.PI/2, 0, 0x8a4a3a, {occlude:false, roughness:1});
+
+  /* ============================================================
+     GRIME SYSTEM
+     ============================================================ */
+  var raycaster = new THREE.Raycaster();
+  var centerVec2 = new THREE.Vector2(0,0);
+  var allGrimeSurfaces = [];
+  var interactables = solidMeshes.slice();
+
+  function drawBlob(ctx, size, cx, cy, rFrac, opacity, rgb){
+    var px = cx*size, py = cy*size, pr = Math.max(1, rFrac*size);
+    var g = ctx.createRadialGradient(px,py,0, px,py,pr);
+    g.addColorStop(0, 'rgba('+rgb[0]+','+rgb[1]+','+rgb[2]+','+opacity+')');
+    g.addColorStop(1, 'rgba('+rgb[0]+','+rgb[1]+','+rgb[2]+',0)');
+    ctx.fillStyle = g;
+    ctx.beginPath();
+    ctx.arc(px,py,pr,0,Math.PI*2);
+    ctx.fill();
+  }
+
+  function paintScatteredGrime(ctx, size, rgb, density){
+    var counts = density==='light' ? {base:24,edge:16,corner:10}
+               : density==='heavy' ? {base:64,edge:46,corner:36}
+               : {base:44,edge:30,corner:24};
+    var i;
+    for(i=0;i<counts.base;i++){
+      drawBlob(ctx,size, Math.random(), Math.random(), rand(0.05,0.13), rand(0.10,0.24), rgb);
+    }
+    var edgeBand = 0.16;
+    for(i=0;i<counts.edge;i++){
+      var edge = Math.floor(Math.random()*4);
+      var t = Math.random(), d = Math.random()*edgeBand;
+      var cx, cy;
+      if(edge===0){ cx=t; cy=d; }
+      else if(edge===1){ cx=1-d; cy=t; }
+      else if(edge===2){ cx=t; cy=1-d; }
+      else { cx=d; cy=t; }
+      drawBlob(ctx,size,cx,cy, rand(0.06,0.15), rand(0.16,0.30), rgb);
+    }
+    var corners = [[0,0],[1,0],[0,1],[1,1]];
+    var cornerBand = 0.26;
+    for(i=0;i<counts.corner;i++){
+      var c = corners[Math.floor(Math.random()*4)];
+      var t2 = Math.random();
+      var cx2 = clamp01(c[0] + (c[0]===0?1:-1)*t2*cornerBand);
+      var cy2 = clamp01(c[1] + (c[1]===0?1:-1)*t2*cornerBand);
+      drawBlob(ctx,size,cx2,cy2, rand(0.08,0.20), rand(0.22,0.42), rgb);
+    }
+    var speckCount = Math.floor(size*size/2400);
+    for(i=0;i<speckCount;i++){
+      var sx = Math.random()*size, sy = Math.random()*size;
+      var r2 = Math.max(0,rgb[0]-30), g2 = Math.max(0,rgb[1]-30), b2 = Math.max(0,rgb[2]-30);
+      ctx.fillStyle = 'rgba('+r2+','+g2+','+b2+','+rand(0.12,0.3)+')';
+      ctx.fillRect(sx,sy,1,1);
+    }
+  }
+
+  function drawCobweb(ctx, size, cx, cy, rFrac, strands, rings){
+    strands = strands||7; rings = rings||4;
+    var px = cx*size, py = cy*size, pr = rFrac*size;
+    ctx.save();
+    ctx.strokeStyle = 'rgba(232,228,218,0.5)';
+    ctx.lineWidth = Math.max(1, size*0.0028);
+    ctx.lineCap = 'round';
+    var angles = [];
+    var i;
+    for(i=0;i<strands;i++) angles.push(rand(0, Math.PI/2*1.15));
+    angles.sort(function(a,b){ return a-b; });
+    for(i=0;i<angles.length;i++){
+      var a = angles[i];
+      ctx.beginPath();
+      ctx.moveTo(px,py);
+      ctx.lineTo(px+Math.cos(a)*pr, py+Math.sin(a)*pr);
+      ctx.stroke();
+    }
+    for(var r=1;r<=rings;r++){
+      var rr = pr*(r/rings);
+      ctx.beginPath();
+      for(i=0;i<angles.length;i++){
+        var a2 = angles[i];
+        var x = px+Math.cos(a2)*rr, y = py+Math.sin(a2)*rr;
+        if(i===0) ctx.moveTo(x,y); else ctx.lineTo(x,y);
+      }
+      ctx.stroke();
+    }
+    ctx.restore();
+    paintScatteredGrime(ctx, size, [150,140,122], 'light');
+  }
+
+  function createGrimeSurface(opts){
+    var sizePx = opts.canvasSize || 256;
+    var canvas = document.createElement('canvas');
+    canvas.width = sizePx; canvas.height = sizePx;
+    var ctx = canvas.getContext('2d');
+    ctx.clearRect(0,0,sizePx,sizePx);
+
+    if(opts.kind === 'cobweb'){
+      drawCobweb(ctx, sizePx, 0.15, 0.15, 0.85, 7, 4);
+    } else {
+      paintScatteredGrime(ctx, sizePx, opts.colorRGB, opts.density||'normal');
+    }
+
+    var texture = new THREE.CanvasTexture(canvas);
+    texture.needsUpdate = true;
+
+    var geo = new THREE.PlaneGeometry(opts.width, opts.height);
+    var mat = new THREE.MeshStandardMaterial({
+      map: texture, transparent:true, depthWrite:false, roughness:0.95, metalness:0,
+      polygonOffset:true, polygonOffsetFactor:-1, polygonOffsetUnits:-1
+    });
+    var mesh = new THREE.Mesh(geo, mat);
+    mesh.position.set(opts.posX, opts.posY, opts.posZ);
+    mesh.rotation.x = opts.rotX||0;
+    mesh.rotation.y = opts.rotY||0;
+    scene.add(mesh);
+
+    var g = {
+      id: opts.id, zone: opts.zone, hardness: opts.hardness,
+      canvas: canvas, ctx: ctx, texture: texture,
+      width: opts.width, height: opts.height, mesh: mesh,
+      remaining: 1, dirty: true, bonus: !!opts.bonus
+    };
+    mesh.userData.isGrime = true;
+    mesh.userData.grime = g;
+    allGrimeSurfaces.push(g);
+    interactables.push(mesh);
+    computePercent(g);
+    return g;
+  }
+
+  function alphaAt(g, u, v){
+    var x = Math.floor(u*g.canvas.width);
+    var y = Math.floor((1-v)*g.canvas.height);
+    x = Math.max(0, Math.min(g.canvas.width-1, x));
+    y = Math.max(0, Math.min(g.canvas.height-1, y));
+    var d = g.ctx.getImageData(x,y,1,1).data;
+    return d[3]/255;
+  }
+
+  function eraseAt(g, u, v, radiusPx, strength){
+    var px = u*g.canvas.width, py = (1-v)*g.canvas.height;
+    var ctx = g.ctx;
+    ctx.save();
+    ctx.globalCompositeOperation = 'destination-out';
+    var grad = ctx.createRadialGradient(px,py,0, px,py,radiusPx);
+    grad.addColorStop(0, 'rgba(0,0,0,'+strength+')');
+    grad.addColorStop(1, 'rgba(0,0,0,0)');
+    ctx.fillStyle = grad;
+    ctx.beginPath();
+    ctx.arc(px,py,radiusPx,0,Math.PI*2);
+    ctx.fill();
+    ctx.restore();
+    g.texture.needsUpdate = true;
+    g.dirty = true;
+  }
+
+  function computePercent(g){
+    var step = g.canvas.width > 300 ? 6 : 4;
+    var img = g.ctx.getImageData(0,0,g.canvas.width,g.canvas.height).data;
+    var total=0, count=0;
+    for(var y=0;y<g.canvas.height;y+=step){
+      for(var x=0;x<g.canvas.width;x+=step){
+        var i = (y*g.canvas.width+x)*4;
+        total += img[i+3];
+        count++;
+      }
+    }
+    g.remaining = count>0 ? (total/count/255) : 0;
+    if(g.remaining < CFG.alphaEps) g.mesh.visible = false;
+    return g.remaining;
+  }
+
+  var GRIME_COLORS = {
+    dust:    [148,134,112],
+    smudge:  [108,110,114],
+    grease:  [80,66,46],
+    mold:    [90,98,66],
+    stain:   [98,64,36],
+    groundin:[72,60,48]
+  };
+
+  // Zone 1: Desk
+  var deskDust  = createGrimeSurface({ id:'deskDust', zone:1, hardness:1, width:1.15, height:0.6, canvasSize:256,
+    colorRGB:GRIME_COLORS.dust, density:'normal',
+    posX:-3.2, posY:0.75+CFG.eps*2, posZ:-3.0, rotX:-Math.PI/2 });
+  var chairDust = createGrimeSurface({ id:'chairDust', zone:1, hardness:1, width:0.34, height:0.34, canvasSize:128,
+    colorRGB:GRIME_COLORS.dust, density:'light',
+    posX:-3.2, posY:0.46+CFG.eps, posZ:-2.3, rotX:-Math.PI/2 });
+  var deskStain = createGrimeSurface({ id:'deskStain', zone:1, hardness:2, width:0.85, height:0.42, canvasSize:256,
+    colorRGB:GRIME_COLORS.stain, density:'normal', bonus:true,
+    posX:-3.2, posY:0.75+CFG.eps, posZ:-3.0, rotX:-Math.PI/2 });
+
+  // Zone 2: Shelf, nightstand, window
+  var shelfDust = createGrimeSurface({ id:'shelfDust', zone:2, hardness:1, width:0.78, height:0.3, canvasSize:256,
+    colorRGB:GRIME_COLORS.dust, density:'heavy',
+    posX:2.6, posY:2.0+CFG.eps, posZ:-3.28, rotX:-Math.PI/2 });
+  var nightstandDust = createGrimeSurface({ id:'nightstandDust', zone:2, hardness:1, width:0.32, height:0.32, canvasSize:128,
+    colorRGB:GRIME_COLORS.dust, density:'light',
+    posX:-2.0, posY:0.5+CFG.eps, posZ:0.75, rotX:-Math.PI/2 });
+  var windowSmudge = createGrimeSurface({ id:'windowSmudge', zone:2, hardness:2, width:1.28, height:1.18, canvasSize:256,
+    colorRGB:GRIME_COLORS.smudge, density:'normal',
+    posX:0, posY:1.9, posZ:-3.40, rotX:0 });
+
+  // Zone 3: Ceiling cobwebs
+  var cobweb1 = createGrimeSurface({ id:'cobweb1', zone:3, hardness:2, width:0.6, height:0.6, canvasSize:192,
+    colorRGB:GRIME_COLORS.dust, kind:'cobweb',
+    posX:3.6, posY:3.38, posZ:1.6, rotX:Math.PI/2 });
+  var cobweb2 = createGrimeSurface({ id:'cobweb2', zone:3, hardness:2, width:0.6, height:0.6, canvasSize:192,
+    colorRGB:GRIME_COLORS.dust, kind:'cobweb',
+    posX:2.6, posY:3.38, posZ:-3.0, rotX:Math.PI/2 });
+  var cobweb3 = createGrimeSurface({ id:'cobweb3', zone:3, hardness:2, width:0.6, height:0.6, canvasSize:192,
+    colorRGB:GRIME_COLORS.dust, kind:'cobweb',
+    posX:-3.3, posY:3.38, posZ:-3.0, rotX:Math.PI/2 });
+
+  // Zone 4: Wardrobe, wall, rug, floor
+  var wardrobeGrease = createGrimeSurface({ id:'wardrobeGrease', zone:4, hardness:3, width:0.52, height:1.55, canvasSize:256,
+    colorRGB:GRIME_COLORS.grease, density:'normal',
+    posX:2.92, posY:1.15, posZ:1.6, rotY:-Math.PI/2 });
+  var wallMold = createGrimeSurface({ id:'wallMold', zone:4, hardness:3, width:0.68, height:0.52, canvasSize:256,
+    colorRGB:GRIME_COLORS.mold, density:'normal',
+    posX:1.15, posY:1.3, posZ:-3.47 });
+  var rugDust = createGrimeSurface({ id:'rugDust', zone:4, hardness:1, width:2.25, height:1.85, canvasSize:512,
+    colorRGB:GRIME_COLORS.dust, density:'heavy',
+    posX:0.2, posY:0.014, posZ:0.6, rotX:-Math.PI/2 });
+  var floorScuff1 = createGrimeSurface({ id:'floorScuff1', zone:4, hardness:3, width:0.46, height:0.36, canvasSize:160,
+    colorRGB:GRIME_COLORS.groundin, density:'normal',
+    posX:0.6, posY:0.007, posZ:2.85, rotX:-Math.PI/2 });
+  var floorScuff2 = createGrimeSurface({ id:'floorScuff2', zone:4, hardness:3, width:0.42, height:0.34, canvasSize:160,
+    colorRGB:GRIME_COLORS.groundin, density:'normal',
+    posX:2.55, posY:0.007, posZ:0.95, rotX:-Math.PI/2 });
+
+  /* ============================================================
+     TRASH
+     ============================================================ */
+  var trashMeshes = [];
+  var TOTAL_TRASH = 5;
+  var trashCollected = 0;
+  var trashPositions = [
+    [1.5,0.08,2.0], [-1.0,0.09,-0.4], [0.4,0.07,-1.6], [2.9,0.08,2.7], [-1.6,0.08,2.5]
+  ];
+  trashPositions.forEach(function(p, idx){
+    var geo = new THREE.IcosahedronGeometry(0.075, 0);
+    var mat = new THREE.MeshStandardMaterial({ color: idx%2===0?0xcfc6b0:0x9a9a92, roughness:1, flatShading:true });
+    var mesh = new THREE.Mesh(geo, mat);
+    mesh.position.set(p[0],p[1],p[2]);
+    mesh.rotation.set(rand(0,Math.PI), rand(0,Math.PI), rand(0,Math.PI));
+    scene.add(mesh);
+    mesh.userData.isTrash = true;
+    trashMeshes.push(mesh);
+  });
+
+  /* ============================================================
+     TOOLS & ZONES
+     ============================================================ */
+  var tools = [
+    { id:'tissue', name:'Tissue Paper',   power:1, radius:0.10,  strengthPerSec:3.2, pitch:1500, unlocked:true  },
+    { id:'wipes',  name:'Wet Wipes',      power:2, radius:0.145, strengthPerSec:4.0, pitch:980,  unlocked:false },
+    { id:'duster', name:'Feather Duster', power:2, radius:0.21,  strengthPerSec:3.4, pitch:640,  unlocked:false },
+    { id:'spray',  name:'Spray & Sponge', power:3, radius:0.165, strengthPerSec:4.6, pitch:1120, unlocked:false }
+  ];
+  var currentToolIndex = 0;
+
+  var zones = [
+    { id:1, name:'Desk',                    required:[deskDust,chairDust],                          threshold:CFG.zoneThreshold, unlocksToolIndex:1,    completed:false, percent:0 },
+    { id:2, name:'Shelf & Window',          required:[shelfDust,nightstandDust,windowSmudge],        threshold:CFG.zoneThreshold, unlocksToolIndex:2,    completed:false, percent:0 },
+    { id:3, name:'Ceiling Corners',         required:[cobweb1,cobweb2,cobweb3],                      threshold:CFG.zoneThreshold, unlocksToolIndex:3,    completed:false, percent:0 },
+    { id:4, name:'Wardrobe, Walls & Floor', required:[wardrobeGrease,wallMold,rugDust,floorScuff1,floorScuff2], threshold:CFG.zoneThreshold, unlocksToolIndex:null, completed:false, percent:0 }
+  ];
+
+  /* ============================================================
+     PLAYER STATE & MOVEMENT
+     ============================================================ */
+  var player = { x:0.3, z:2.9, eyeHeight: CFG.eyeHeightStand };
+  var yaw = 0, pitch = 0;
+  var crouching = false;
+  var keys = Object.create(null);
+  var mouseDown = false;
+  var controlsEnabled = false;
+  var gameStarted = false;
+  var finaleTriggered = false;
+
+  camera.position.set(player.x, player.eyeHeight, player.z);
+
+  function collidesXZ(x,z,r){
+    if(x-r<ROOM_BOUNDS.minX || x+r>ROOM_BOUNDS.maxX || z-r<ROOM_BOUNDS.minZ || z+r>ROOM_BOUNDS.maxZ) return true;
+    for(var i=0;i<collidables.length;i++){
+      var b = collidables[i];
+      if(x+r>b.minX && x-r<b.maxX && z+r>b.minZ && z-r<b.maxZ) return true;
+    }
+    return false;
+  }
+
+  function updateMovement(delta){
+    var sinY=Math.sin(yaw), cosY=Math.cos(yaw);
+    var fx=-sinY, fz=-cosY, rx=cosY, rz=-sinY;
+    var ix=0, iz=0;
+    if(keys.KeyW) iz+=1;
+    if(keys.KeyS) iz-=1;
+    if(keys.KeyD) ix+=1;
+    if(keys.KeyA) ix-=1;
+    var speed = CFG.moveSpeed;
+    if(keys.ShiftLeft || keys.ShiftRight) speed *= CFG.sprintMult;
+    if(crouching) speed *= CFG.crouchMult;
+    if(ix!==0 || iz!==0){
+      var len = Math.sqrt(ix*ix+iz*iz);
+      ix/=len; iz/=len;
+      var dx = (fx*iz + rx*ix)*speed*delta;
+      var dz = (fz*iz + rz*ix)*speed*delta;
+      var r = CFG.playerRadius;
+      var nx = player.x+dx;
+      if(!collidesXZ(nx, player.z, r)) player.x = nx;
+      var nz = player.z+dz;
+      if(!collidesXZ(player.x, nz, r)) player.z = nz;
+    }
+    var targetHeight = crouching ? CFG.eyeHeightCrouch : CFG.eyeHeightStand;
+    player.eyeHeight += (targetHeight-player.eyeHeight)*Math.min(1, delta*8);
+  }
+
+  function updateCamera(){
+    camera.position.set(player.x, player.eyeHeight, player.z);
+    camera.rotation.x = pitch;
+    camera.rotation.y = yaw;
+    camera.rotation.z = 0;
+  }
+
+  /* ============================================================
+     INPUT
+     ============================================================ */
+  document.addEventListener('mousemove', function(e){
+    if(!controlsEnabled) return;
+    yaw -= e.movementX*CFG.mouseSens;
+    pitch -= e.movementY*CFG.mouseSens;
+    var maxPitch = Math.PI/2 - 0.02;
+    pitch = Math.max(-maxPitch, Math.min(maxPitch, pitch));
+  });
+
+  window.addEventListener('keydown', function(e){
+    keys[e.code] = true;
+    if(!controlsEnabled) return;
+    if(e.code==='Digit1') selectTool(0);
+    else if(e.code==='Digit2') selectTool(1);
+    else if(e.code==='Digit3') selectTool(2);
+    else if(e.code==='Digit4') selectTool(3);
+    else if(e.code==='KeyQ') spotCheck();
+    else if(e.code==='KeyC') crouching = !crouching;
+    else if(e.code==='KeyE') tryPickupTrash();
+  });
+  window.addEventListener('keyup', function(e){ keys[e.code] = false; });
+  window.addEventListener('blur', function(){
+    for(var k in keys) keys[k] = false;
+    mouseDown = false;
+    setScrubActive(false);
+  });
+
+  renderer.domElement.addEventListener('mousedown', function(e){
+    if(controlsEnabled && e.button===0) mouseDown = true;
+  });
+  window.addEventListener('mouseup', function(e){ if(e.button===0) mouseDown = false; });
+  window.addEventListener('wheel', function(e){
+    if(!controlsEnabled) return;
+    cycleTool(e.deltaY>0 ? 1 : -1);
+  }, {passive:true});
+
+  function selectTool(i){
+    if(i<0 || i>=tools.length) return;
+    if(!tools[i].unlocked){ showHint("You haven't found the " + tools[i].name + " yet."); return; }
+    currentToolIndex = i;
+    updateHUD();
+  }
+  function cycleTool(dir){
+    var unlockedIdx = [];
+    for(var i=0;i<tools.length;i++) if(tools[i].unlocked) unlockedIdx.push(i);
+    var pos = unlockedIdx.indexOf(currentToolIndex);
+    pos = (pos+dir+unlockedIdx.length) % unlockedIdx.length;
+    currentToolIndex = unlockedIdx[pos];
+    updateHUD();
+  }
+
+  /* ============================================================
+     AUDIO
+     ============================================================ */
+  var audioCtx=null, masterGain=null, scrubGain=null, scrubFilter=null;
+
+  function initAudio(){
+    if(audioCtx){ if(audioCtx.state==='suspended') audioCtx.resume(); return; }
+    try{
+      var AC = window.AudioContext || window.webkitAudioContext;
+      audioCtx = new AC();
+      masterGain = audioCtx.createGain(); masterGain.gain.value=0.55; masterGain.connect(audioCtx.destination);
+
+      var ambientNoise = createNoiseSource(true);
+      var ambientFilter = audioCtx.createBiquadFilter(); ambientFilter.type='lowpass'; ambientFilter.frequency.value=260;
+      var ambientGain = audioCtx.createGain(); ambientGain.gain.value=0.025;
+      ambientNoise.connect(ambientFilter); ambientFilter.connect(ambientGain); ambientGain.connect(masterGain);
+      ambientNoise.start();
+
+      var scrubNoise = createNoiseSource(true);
+      scrubFilter = audioCtx.createBiquadFilter(); scrubFilter.type='bandpass'; scrubFilter.frequency.value=900; scrubFilter.Q.value=0.8;
+      scrubGain = audioCtx.createGain(); scrubGain.gain.value=0.0001;
+      scrubNoise.connect(scrubFilter); scrubFilter.connect(scrubGain); scrubGain.connect(masterGain);
+      scrubNoise.start();
+    }catch(err){
+      audioCtx = null; // audio is optional — the game still works without it
+    }
+  }
+  function createNoiseSource(loop){
+    var bufferSize = audioCtx.sampleRate*2;
+    var buffer = audioCtx.createBuffer(1, bufferSize, audioCtx.sampleRate);
+    var data = buffer.getChannelData(0);
+    for(var i=0;i<bufferSize;i++) data[i] = Math.random()*2-1;
+    var src = audioCtx.createBufferSource();
+    src.buffer = buffer; src.loop = !!loop;
+    return src;
+  }
+  function setScrubActive(active, tool){
+    if(!audioCtx || !scrubGain) return;
+    var now = audioCtx.currentTime;
+    if(active){
+      scrubGain.gain.setTargetAtTime(0.16, now, 0.05);
+      if(tool) scrubFilter.frequency.setTargetAtTime(tool.pitch, now, 0.12);
+    } else {
+      scrubGain.gain.setTargetAtTime(0.0001, now, 0.09);
+    }
+  }
+  function playChime(freq, delaySec, dur){
+    if(!audioCtx) return;
+    delaySec = delaySec||0; dur = dur||0.8;
+    var t = audioCtx.currentTime + delaySec;
+    var osc = audioCtx.createOscillator();
+    osc.type='sine'; osc.frequency.value=freq;
+    var g = audioCtx.createGain();
+    g.gain.setValueAtTime(0, t);
+    g.gain.linearRampToValueAtTime(0.22, t+0.02);
+    g.gain.exponentialRampToValueAtTime(0.0008, t+dur);
+    osc.connect(g); g.connect(masterGain);
+    osc.start(t); osc.stop(t+dur+0.05);
+  }
+  function playChord(freqs, dur){
+    for(var i=0;i<freqs.length;i++) playChime(freqs[i], i*0.02, dur||1.0);
+  }
+
+  /* ============================================================
+     HUD
+     ============================================================ */
+  var toastEl = document.getElementById('toast');
+  var hintEl = document.getElementById('hint');
+  var toastTimer=null, hintTimer=null;
+  var lastHintMsg='', lastHintTime=-999;
+
+  function showToast(msg){
+    toastEl.textContent = msg;
+    toastEl.classList.add('show');
+    clearTimeout(toastTimer);
+    toastTimer = setTimeout(function(){ toastEl.classList.remove('show'); }, 2600);
+  }
+  function showHint(msg){
+    var now = performance.now()/1000;
+    if(msg===lastHintMsg && now-lastHintTime<1.1) return;
+    lastHintMsg = msg; lastHintTime = now;
+    hintEl.textContent = msg;
+    hintEl.classList.add('show');
+    clearTimeout(hintTimer);
+    hintTimer = setTimeout(function(){ hintEl.classList.remove('show'); }, 1500);
+  }
+  function spotCheck(){
+    var open = [];
+    for(var i=0;i<zones.length;i++){
+      if(!zones[i].completed) open.push(zones[i].name+': '+Math.round(zones[i].percent*100)+'%');
+    }
+    var msg;
+    if(open.length===0){
+      msg = trashCollected<TOTAL_TRASH ? ((TOTAL_TRASH-trashCollected)+' more piece(s) of trash somewhere.') : 'Everything looks done — nice work!';
+    } else {
+      msg = open.join('  ·  ');
+    }
+    showToast('Still needs attention — ' + msg);
+  }
+
+  var roomPctEl = document.getElementById('roomPct');
+  var zoneInfoEl = document.getElementById('zoneInfo');
+  var trashCounterEl = document.getElementById('trashCounter');
+  var toolbarEl = document.getElementById('toolbar');
+
+  function updateHUD(){
+    var sum=0;
+    for(var i=0;i<zones.length;i++) sum += zones[i].percent;
+    var avg = sum/zones.length;
+    roomPctEl.textContent = Math.round(avg*100) + '% clean';
+    var active = null;
+    for(i=0;i<zones.length;i++){ if(!zones[i].completed){ active = zones[i]; break; } }
+    if(!active) active = zones[zones.length-1];
+    zoneInfoEl.textContent = active.name + ' — ' + Math.round(active.percent*100) + '%' + (active.completed?' done':'');
+    trashCounterEl.textContent = 'Trash ' + trashCollected + '/' + TOTAL_TRASH;
+    renderToolbar();
+  }
+  function renderToolbar(){
+    toolbarEl.innerHTML = '';
+    for(var i=0;i<tools.length;i++){
+      var t = tools[i];
+      var slot = document.createElement('div');
+      slot.className = 'toolSlot' + (t.unlocked?'':' locked') + (i===currentToolIndex?' active':'');
+      slot.innerHTML = '<span class="toolKey">'+(i+1)+'</span><span class="toolName">'+t.name+'</span>';
+      toolbarEl.appendChild(slot);
+    }
+  }
+
+  var ringProgress = document.getElementById('ringProgress');
+  var RING_CIRC = 2*Math.PI*18;
+  ringProgress.setAttribute('stroke-dasharray', RING_CIRC.toFixed(2));
+  ringProgress.style.strokeDashoffset = RING_CIRC.toFixed(2);
+  function updateAimRing(g){
+    if(!g){ ringProgress.style.strokeDashoffset = RING_CIRC.toFixed(2); return; }
+    var clean = clamp01(1-g.remaining);
+    ringProgress.style.strokeDashoffset = (RING_CIRC*(1-clean)).toFixed(2);
+  }
+
+  /* ============================================================
+     CLEANING / PICKUP INTERACTION
+     ============================================================ */
+  function handleCleaning(delta){
+    raycaster.setFromCamera(centerVec2, camera);
+    var hits = raycaster.intersectObjects(interactables, false);
+    var target = null;
+    for(var i=0;i<hits.length;i++){
+      var h = hits[i];
+      if(h.distance > CFG.maxInteractRange) break;
+      var obj = h.object;
+      if(obj.userData.isGrime){
+        var g = obj.userData.grime;
+        var a = alphaAt(g, h.uv.x, h.uv.y);
+        if(a > CFG.alphaEps){ target = {hit:h, grime:g}; break; }
+        else continue;
+      } else {
+        break;
+      }
+    }
+    if(!target){ setScrubActive(false); updateAimRing(null); return; }
+    var g2 = target.grime;
+    updateAimRing(g2);
+    var tool = tools[currentToolIndex];
+    if(tool.power < g2.hardness){
+      setScrubActive(false);
+      showHint('The ' + tool.name + " can't handle this — try a stronger tool.");
+      return;
+    }
+    var pxRadius = (tool.radius/g2.width)*g2.canvas.width;
+    var strength = Math.min(0.9, tool.strengthPerSec*delta);
+    eraseAt(g2, target.hit.uv.x, target.hit.uv.y, pxRadius, strength);
+    setScrubActive(true, tool);
+    spawnMotes(target.hit.point, 1);
+  }
+
+  function tryPickupTrash(){
+    raycaster.setFromCamera(centerVec2, camera);
+    var hits = raycaster.intersectObjects(trashMeshes, false);
+    if(hits.length && hits[0].distance <= 1.9){
+      var m = hits[0].object;
+      scene.remove(m);
+      var idx = trashMeshes.indexOf(m);
+      if(idx>=0) trashMeshes.splice(idx,1);
+      trashCollected++;
+      playChime(1046.5, 0, 0.5);
+      showToast('Picked up trash (' + trashCollected + '/' + TOTAL_TRASH + ')');
+      updateHUD();
+      checkFinale();
+    } else {
+      showHint('Nothing to pick up there.');
+    }
+  }
+
+  /* ============================================================
+     ZONES / UNLOCKS / FINALE
+     ============================================================ */
+  function updateZonesAndUnlocks(){
+    var anyChange=false;
+    for(var i=0;i<zones.length;i++){
+      var z = zones[i];
+      var sum=0;
+      for(var j=0;j<z.required.length;j++) sum += (1-z.required[j].remaining);
+      z.percent = sum/z.required.length;
+      if(!z.completed && z.percent >= z.threshold){
+        z.completed = true;
+        onZoneComplete(z);
+        anyChange = true;
+      }
+    }
+    return anyChange;
+  }
+  function onZoneComplete(zone){
+    playChord([880,1108.7,1318.5], 1.1);
+    showToast('Zone clean: ' + zone.name + '!');
+    if(zone.unlocksToolIndex!=null){
+      var t = tools[zone.unlocksToolIndex];
+      if(!t.unlocked){
+        t.unlocked = true;
+        currentToolIndex = zone.unlocksToolIndex;
+        (function(tt){ setTimeout(function(){ showToast('New tool: ' + tt.name + '!'); }, 1700); })(t);
+      }
+    }
+    checkFinale();
+  }
+  function checkFinale(){
+    if(finaleTriggered) return;
+    var allZones = true;
+    for(var i=0;i<zones.length;i++) if(!zones[i].completed) allZones = false;
+    if(allZones && trashCollected>=TOTAL_TRASH) triggerFinale();
+  }
+  var finaleStartTime = -1;
+  function triggerFinale(){
+    finaleTriggered = true;
+    mouseDown = false;
+    setScrubActive(false);
+    try{ document.exitPointerLock(); }catch(e){}
+    playChord([523.25,659.25,783.99,1046.5], 1.6);
+    finaleStartTime = clock.elapsedTime;
+    setTimeout(function(){
+      document.getElementById('completion').classList.remove('hidden');
+    }, 2200);
+  }
+  function updateFinaleTransition(){
+    if(finaleStartTime<0) return;
+    var t = clamp01((clock.elapsedTime-finaleStartTime)/3.2);
+    ambientLight.intensity = lerp(0.55, 0.9, t);
+    hemiLight.intensity = lerp(0.4, 0.7, t);
+    sunLight.intensity = lerp(0.85, 1.5, t);
+    sunLight.color.setRGB(1, lerp(0.94,0.97,t), lerp(0.82,0.9,t));
+  }
+
+  /* ============================================================
+     DUST MOTES
+     ============================================================ */
+  var motes = [];
+  function spawnMotes(point, count){
+    if(!point || motes.length>45) return;
+    for(var i=0;i<count;i++){
+      var mat = new THREE.SpriteMaterial({ color:0xd9cdb4, transparent:true, opacity:0.55, depthWrite:false });
+      var sprite = new THREE.Sprite(mat);
+      var s = rand(0.015,0.035);
+      sprite.scale.set(s,s,1);
+      sprite.position.set(point.x+rand(-0.03,0.03), point.y+rand(-0.02,0.02), point.z+rand(-0.03,0.03));
+      scene.add(sprite);
+      motes.push({ sprite:sprite, vel:new THREE.Vector3(rand(-0.15,0.15), rand(0.15,0.4), rand(-0.15,0.15)), life:rand(0.5,0.95), maxLife:0.95 });
+    }
+  }
+  function updateMotes(delta){
+    for(var i=motes.length-1;i>=0;i--){
+      var m = motes[i];
+      m.life -= delta;
+      if(m.life<=0){
+        scene.remove(m.sprite);
+        m.sprite.material.dispose();
+        motes.splice(i,1);
+        continue;
+      }
+      m.vel.y -= delta*0.12;
+      m.sprite.position.addScaledVector(m.vel, delta);
+      m.sprite.material.opacity = 0.55*clamp01(m.life/m.maxLife);
+    }
+  }
+
+  /* ============================================================
+     POINTER LOCK / START FLOW
+     ============================================================ */
+  var blocker = document.getElementById('blocker');
+  var hud = document.getElementById('hud');
+  var startBtn = document.getElementById('startBtn');
+  var introText = document.getElementById('introText');
+
+  startBtn.addEventListener('click', function(){
+    initAudio(); // must run synchronously inside the click gesture
+    var el = renderer.domElement;
+    var req = el.requestPointerLock || el.mozRequestPointerLock;
+    if(req) req.call(el);
+  });
+
+  function onPointerLockChange(){
+    var locked = (document.pointerLockElement===renderer.domElement) || (document.mozPointerLockElement===renderer.domElement);
+    controlsEnabled = !!locked;
+    if(locked){
+      blocker.classList.add('hidden');
+      hud.classList.remove('hidden');
+      if(!gameStarted){ gameStarted = true; updateHUD(); }
+    } else {
+      mouseDown = false;
+      setScrubActive(false);
+      if(!finaleTriggered){
+        blocker.classList.remove('hidden');
+        if(gameStarted){
+          startBtn.textContent = 'Click to resume';
+          if(introText) introText.classList.add('hidden');
+        }
+      }
+    }
+  }
+  document.addEventListener('pointerlockchange', onPointerLockChange, false);
+  document.addEventListener('mozpointerlockchange', onPointerLockChange, false);
+
+  document.getElementById('restartBtn').addEventListener('click', function(){
+    location.reload();
+  });
+
+  /* ============================================================
+     MAIN LOOP
+     ============================================================ */
+  var clock = new THREE.Clock();
+  var statsAccum = 0;
+
+  function statsThrottle(delta){
+    statsAccum += delta;
+    if(statsAccum < 0.15) return;
+    statsAccum = 0;
+    var anyDirty = false;
+    for(var i=0;i<allGrimeSurfaces.length;i++){
+      var g = allGrimeSurfaces[i];
+      if(g.dirty){ computePercent(g); g.dirty=false; anyDirty=true; }
+    }
+    if(anyDirty){ updateZonesAndUnlocks(); updateHUD(); }
+  }
+
+  function animate(){
+    requestAnimationFrame(animate);
+    var delta = Math.min(clock.getDelta(), 0.05);
+
+    if(gameStarted && !finaleTriggered && controlsEnabled){
+      updateMovement(delta);
+    }
+    updateCamera();
+
+    if(controlsEnabled && mouseDown && !finaleTriggered){
+      handleCleaning(delta);
+    } else if(!mouseDown){
+      setScrubActive(false);
+      updateAimRing(null);
+    }
+
+    updateMotes(delta);
+    updateFinaleTransition();
+    statsThrottle(delta);
+
+    renderer.render(scene, camera);
+  }
+  animate();
+
+  })();
+  </script>
+</body>
+</html>
